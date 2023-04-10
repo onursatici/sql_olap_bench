@@ -1,0 +1,8 @@
+duckdb --pre --update
+loguru
+numpy
+pandas
+tableauhyperapi
+datafusion
+psycopg2
+pyarrow
