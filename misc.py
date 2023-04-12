@@ -1,4 +1,6 @@
 import os
+import re
+
 
 def find_subfolders_with_prefix(parent_folder, prefix):
     """
@@ -15,3 +17,12 @@ def find_subfolders_with_prefix(parent_folder, prefix):
             matching_subfolders.append(parent_folder)
 
     return matching_subfolders
+
+
+def get_query_tag(query_txt):
+    match = re.search("--query(\d+)", query_txt)
+    if match:
+        query_tag = match.group(1)
+    else:
+        query_tag = "00"
+    return query_tag

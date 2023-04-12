@@ -10,6 +10,8 @@ import pandas as pd
 import psycopg2
 from tableauhyperapi import Connection, CreateMode, HyperProcess, Telemetry
 
+from misc import get_query_tag
+
 
 def get_queries(txt, scale_factor):
     queries_txt = txt.replace("__COEF__", str(float(0.0001 / scale_factor)))
@@ -44,8 +46,7 @@ def run_queries_duckdb_on_duckdb(subfolders, queries_duckdb, logger, tmp_dir_pat
         logger.info(f"DuckDB file path : {duckdb_file_path}")
 
         for i, query in enumerate(queries):
-            # query_tag = query.split("--query")[1][:3].rstrip()
-            query_tag = 0
+            query_tag = get_query_tag(query)
             logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
             with duckdb.connect(database=str(duckdb_file_path), read_only=False) as con:
@@ -148,8 +149,7 @@ def run_queries_duckdb_on_parquet(
             con.execute(q)
 
         for i, query in enumerate(queries):
-            # query_tag = query.split("--query")[1][:3].rstrip()
-            query_tag = 0
+            query_tag = get_query_tag(query)
             logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
             if ((tpc_name == "tpch") and (i + 1 == 21) and (scale_factor == 100.0)) or (
                 (tpc_name == "tpcds") and (i + 1 == 68) and (scale_factor >= 1.0)
@@ -229,8 +229,7 @@ def run_queries_hyper_on_hyper(subfolders, queries_hyper, logger):
                 _ = con.execute_command("SET schema 'Export';")
 
                 for i, query in enumerate(queries):
-                    # query_tag = query.split("--query")[1][:3].rstrip()
-                    query_tag = 0
+                    query_tag = get_query_tag(query)
                     logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
                     start_time_s = perf_counter()
@@ -327,8 +326,7 @@ def run_queries_hyper_on_parquet(subfolders, queries_hyper, logger):
                     _ = con.execute_command(q)
 
                 for i, query in enumerate(queries):
-                    # query_tag = query.split("--query")[1][:3].rstrip()
-                    query_tag = 0
+                    query_tag = get_query_tag(query)
                     logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
                     start_time_s = perf_counter()
@@ -398,8 +396,27 @@ def run_queries_datafusion_on_parquet(subfolders, queries_datafusion, logger):
                 parquet_files_dict[table_name] = [parquet_file_path]
         table_names = list(set(table_names))
 
-        ctx = datafusion.SessionContext()
+        # test
+        #
+        # runtime = (
+        #     datafusion.RuntimeConfig().with_disk_manager_os().with_fair_spill_pool(10000000)
+        # )
+        # config = (
+        #     datafusion.SessionConfig()
+        #     .with_create_default_catalog_and_schema(True)  # .with_default_catalog_and_schema("foo", "bar")
+        #     .with_target_partitions(1)
+        #     .with_information_schema(True)
+        #     .with_repartition_joins(False)
+        #     .with_repartition_aggregations(False)
+        #     .with_repartition_windows(False)
+        #     .with_parquet_pruning(False)
+        # )
+        # config.set("datafusion.execution.parquet.pushdown_filters", "true")
+        # ctx = datafusion.SessionContext(config, runtime)
+        #
 
+        # wrong initial version (e.g. config not being passed into the context)
+        ctx = datafusion.SessionContext()
         config = datafusion.Config()
         config.set("datafusion.execution.parquet.enable_page_index", "true")
         config.set("datafusion.execution.parquet.pushdown_filters", "true")
@@ -417,8 +434,7 @@ def run_queries_datafusion_on_parquet(subfolders, queries_datafusion, logger):
         logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
 
         for i, query in enumerate(queries):
-            # query_tag = query.split("--query")[1][:3].rstrip()
-            query_tag
+            query_tag = get_query_tag(query)
             logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
             skip = False
@@ -511,8 +527,7 @@ def run_queries_postgresql(subfolders, queries_postgresql, logger):
         curs.close()
 
         for i, query in enumerate(queries):
-            # query_tag = query.split("--query")[1][:3].rstrip()
-            query_tag = 0
+            query_tag = get_query_tag(query)
             logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
             curs = conn.cursor()
