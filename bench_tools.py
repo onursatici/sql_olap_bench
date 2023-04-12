@@ -410,17 +410,16 @@ def run_queries_datafusion_on_parquet(subfolders, queries_datafusion, logger):
         #     .with_repartition_aggregations(False)
         #     .with_repartition_windows(False)
         #     .with_parquet_pruning(False)
+        #     # .set("datafusion.execution.parquet.pushdown_filters", "true")
         # )
-        # config.set("datafusion.execution.parquet.pushdown_filters", "true")
         # ctx = datafusion.SessionContext(config, runtime)
-        #
 
         # wrong initial version (e.g. config not being passed into the context)
         ctx = datafusion.SessionContext()
-        config = datafusion.Config()
-        config.set("datafusion.execution.parquet.enable_page_index", "true")
-        config.set("datafusion.execution.parquet.pushdown_filters", "true")
-        config.set("datafusion.execution.parquet.reorder_filters", "true")
+        # config = datafusion.Config()
+        # config.set("datafusion.execution.parquet.enable_page_index", "true")
+        # config.set("datafusion.execution.parquet.pushdown_filters", "true")
+        # config.set("datafusion.execution.parquet.reorder_filters", "true")
 
         logger.info("Register the Parquet files")
         start_time_s = perf_counter()
