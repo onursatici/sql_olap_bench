@@ -28,6 +28,7 @@ def generate_tpch_data_files(
     compression: str = "snappy",
     row_group_size: int = 122_880,
     hyper: bool = True,
+    csv: bool = False,
 ):
     """
     Generate TPC-H benchmark data.
@@ -123,7 +124,8 @@ def generate_tpch_data_files(
                 logger.info(f"{n_rows:>12d} rows, {n_cols:>12d} columns")
 
     # Convert the parquet file to an Hyper file
-    convert_parquets_to_hyper(parquet_dir, logger)
+    if hyper:
+        convert_parquets_to_hyper(parquet_dir, logger)
 
     logger.info("====  END  generate TPC-H data ====")
     elapsed_time_s = perf_counter() - start_time_s
