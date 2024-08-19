@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import psycopg2
 import lance
+import polars as pl
 from tableauhyperapi import Connection, CreateMode, HyperProcess, Telemetry
 
 from misc import get_query_tag
@@ -780,6 +781,119 @@ def run_queries_postgresql(subfolders, queries_postgresql, logger):
         logger.info(f"Elapsed time (s) : {elapsed_time_step:10.3f}")
 
     conn.close()
+
+    timings_df = pd.DataFrame(timings)
+    return timings_df
+
+from polars_queries import PL_QUERIES
+
+def run_queries_polars_on_parquet(subfolders, queries_polars, logger):
+    timings = []
+
+    for folder_path in subfolders:
+        start_time_step = perf_counter()
+        folder_name = os.path.basename(os.path.normpath(folder_path))
+        scale_factor = float(folder_name.split("_")[-1])
+        if folder_name.startswith("tpch"):
+            tpc_name = "tpch"
+        elif folder_name.startswith("tpcds"):
+            tpc_name = "tpcds"
+        logger.info("==== BEGIN ====")
+        logger.info(
+            f"Polars / .parquet - folder : {folder_name}, scale_factor : {scale_factor}"
+        )
+        query_count = len(PL_QUERIES)
+
+        parquet_file_paths = glob.glob(os.path.join(folder_path, "*.parquet"))
+        parquet_file_count = len(parquet_file_paths)
+        logger.info(f"Found {parquet_file_count} Parquet files")
+
+        # list tables
+        table_names = []
+        parquet_files_dict = {}
+        for parquet_file_path in parquet_file_paths:
+            file_name = os.path.basename(parquet_file_path)
+            table_name = os.path.splitext(file_name)[0]
+            if table_name[-3:].isdigit():
+                table_name = table_name[:-4]
+            table_names.append(table_name)
+            if table_name in parquet_files_dict:
+                parquet_files_dict[table_name].append(parquet_file_path)
+            else:
+                parquet_files_dict[table_name] = [parquet_file_path]
+        table_names = list(set(table_names))
+
+        # Load Parquet files into Polars DataFrames
+        dataframes = {}
+        for table_name in table_names:
+            if len(parquet_files_dict[table_name]) > 1:
+                df = pl.concat([pl.scan_parquet(file) for file in parquet_files_dict[table_name]])
+            else:
+                df = pl.scan_parquet(parquet_files_dict[table_name][0])
+            dataframes[table_name] = df
+
+        for i, query in enumerate(PL_QUERIES):
+            logger.info(f"query {i+1} / {query_count} : tag {i}")
+
+            skip = False
+            if (
+                ((tpc_name == "tpch") and (i + 1 == 18) and (scale_factor == 30.0))
+                or ((tpc_name == "tpch") and (i + 1 == 7) and (scale_factor == 100.0))
+                or ((tpc_name == "tpch") and (i + 1 == 17) and (scale_factor == 100.0))
+                or ((tpc_name == "tpch") and (i + 1 == 18) and (scale_factor == 100.0))
+                or ((tpc_name == "tpch") and (i + 1 == 21) and (scale_factor == 100.0))
+            ):
+                skip = True
+
+            if skip:
+                d = dict(
+                    [
+                        ("engine", "Polars"),
+                        ("file_type", "parquet"),
+                        ("scale_factor", scale_factor),
+                        ("query", i + 1),
+                        ("n_returned_rows", np.NaN),
+                        ("elapsed_time_s", np.NaN),
+                    ]
+                )
+            else:
+                try:
+                    start_time_s = perf_counter()
+                    result = query(dataframes).collect(new_streaming=True)
+                    # result = pl.SQLContext(dataframes).execute(query).collect()
+                    elapsed_time_s = perf_counter() - start_time_s
+                    logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
+
+                    n_returned_rows = len(result)
+
+                    d = dict(
+                        [
+                            ("engine", "Polars"),
+                            ("file_type", "parquet"),
+                            ("scale_factor", scale_factor),
+                            ("query", i + 1),
+                            ("n_returned_rows", n_returned_rows),
+                            ("elapsed_time_s", elapsed_time_s),
+                        ]
+                    )
+                except Exception as e:
+                    logger.error(f"Error executing query {i+1}: {str(e)}")
+                    d = dict(
+                        [
+                            ("engine", "Polars"),
+                            ("file_type", "parquet"),
+                            ("scale_factor", scale_factor),
+                            ("query", i + 1),
+                            ("n_returned_rows", np.nan),
+                            ("elapsed_time_s", np.nan),
+                        ]
+                    )
+
+            timings.append(d)
+
+        logger.info("====  END  ====")
+        elapsed_time_step = perf_counter() - start_time_step
+        logger.info(f"Elapsed time (s) : {elapsed_time_step:10.3f}")
 
     timings_df = pd.DataFrame(timings)
     return timings_df
