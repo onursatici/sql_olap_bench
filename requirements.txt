@@ -7,3 +7,4 @@ datafusion
 psycopg2
 pyarrow
 polars
+pylance
