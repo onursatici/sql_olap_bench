@@ -1,4 +1,4 @@
-duckdb --pre --update
+duckdb
 loguru
 numpy
 pandas
@@ -6,3 +6,5 @@ tableauhyperapi
 datafusion
 psycopg2
 pyarrow
+polars
+pylance
