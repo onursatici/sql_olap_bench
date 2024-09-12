@@ -1,7 +1,7 @@
 """
 Generate TPC-H data (Parquet, DuckDB and Hyper files).
 
-The TPC-H benchmark emulates a decision support systems that examines large volumes of data,
+The TPC-H benchmark emulates a decision support systems that examines large volumes of data, 
 executes queries with a high degree of complexity, and gives answers to critical business questions.
 
 Example:
@@ -18,7 +18,6 @@ import duckdb
 from loguru import logger
 
 from hyper_tools import convert_parquets_to_hyper
-from lance_tools import convert_parquets_to_lance
 
 
 def generate_tpch_data_files(
@@ -29,7 +28,6 @@ def generate_tpch_data_files(
     compression: str = "snappy",
     row_group_size: int = 122_880,
     hyper: bool = True,
-    lance: bool = True,
     csv: bool = False,
 ):
     """
@@ -128,9 +126,6 @@ def generate_tpch_data_files(
     # Convert the parquet file to an Hyper file
     if hyper:
         convert_parquets_to_hyper(parquet_dir, logger)
-
-    if lance:
-        convert_parquets_to_lance(parquet_dir, logger)
 
     logger.info("====  END  generate TPC-H data ====")
     elapsed_time_s = perf_counter() - start_time_s

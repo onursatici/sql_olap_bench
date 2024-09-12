@@ -18,14 +18,10 @@ from loguru import logger
 from bench_tools import (
     run_queries_duckdb_on_duckdb,
     run_queries_duckdb_on_parquet,
-    run_queries_duckdb_on_lance,
     run_queries_hyper_on_hyper,
     run_queries_hyper_on_parquet,
     run_queries_datafusion_on_parquet,
-    run_queries_ballista_on_parquet,
-    run_queries_datafusion_on_lance,
     run_queries_postgresql,
-    run_queries_polars_on_parquet,
 )
 from tpch_queries import sql
 from ref_row_count import tpch_ref_n_rows_returned
@@ -83,24 +79,16 @@ if __name__ == "__main__":
     tpch_subfolders = find_subfolders_with_prefix(data_dir_path, "tpch_")
 
     df = pd.DataFrame()
-    # df_tmp = run_queries_polars_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_duckdb_on_duckdb(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_duckdb_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # # df_tmp = run_queries_duckdb_on_lance(tpch_subfolders, sql, logger)
-    # # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_hyper_on_hyper(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_hyper_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_datafusion_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    df_tmp = run_queries_ballista_on_parquet(tpch_subfolders, sql, logger)
+    df_tmp = run_queries_duckdb_on_duckdb(tpch_subfolders, sql, logger)
     df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_datafusion_on_lance(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
+    df_tmp = run_queries_duckdb_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+    df_tmp = run_queries_hyper_on_hyper(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+    df_tmp = run_queries_hyper_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+    df_tmp = run_queries_datafusion_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
     # df_tmp = run_queries_postgresql(tpch_subfolders, sql, logger)
     # df = pd.concat((df, df_tmp), axis=0)
 
