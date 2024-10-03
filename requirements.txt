@@ -9,3 +9,4 @@ pyarrow
 polars
 pylance
 altair[all]
+ray==2.37.0

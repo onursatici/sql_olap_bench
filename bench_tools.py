@@ -2,7 +2,8 @@ import json
 import glob
 import os
 from time import perf_counter
-
+import ray
+from datafusion_ray import DatafusionRayContext
 import datafusion
 import pyballista
 import pyarrow as pa
@@ -681,6 +682,113 @@ def run_queries_ballista_on_parquet(subfolders, queries_datafusion, logger):
                 d = dict(
                     [
                         ("engine", "Ballista"),
+                        ("file_type", "parquet"),
+                        ("scale_factor", scale_factor),
+                        ("query", i + 1),
+                        ("n_returned_rows", n_returned_rows),
+                        ("elapsed_time_s", elapsed_time_s),
+                    ]
+                )
+
+            timings.append(d)
+
+        logger.info("====  END  ====")
+        elapsed_time_step = perf_counter() - start_time_step
+        logger.info(f"Elapsed time (s) : {elapsed_time_step:10.3f}")
+
+    timings_df = pd.DataFrame(timings)
+    return timings_df
+
+
+def run_queries_datafusion_ray_on_parquet(subfolders, queries_datafusion, logger):
+    # Start a local cluster
+    ray.init(resources={"worker": 1})
+
+    timings = []
+
+    for folder_path in subfolders:
+        start_time_step = perf_counter()
+        folder_name = os.path.basename(os.path.normpath(folder_path))
+        scale_factor = float(folder_name.split("_")[-1])
+        if folder_name.startswith("tpch"):
+            tpc_name = "tpch"
+        elif folder_name.startswith("tpcds"):
+            tpc_name = "tpcds"
+        logger.info("==== BEGIN ====")
+        logger.info(
+            f"Datafusion Ray / .parquet - folder : {folder_name}, scale_factor : {scale_factor}"
+        )
+        queries = get_queries(queries_datafusion, scale_factor)
+        query_count = len(queries)
+
+        parquet_file_paths = glob.glob(os.path.join(folder_path, "*.parquet"))
+        parquet_file_count = len(parquet_file_paths)
+        logger.info(f"Found {parquet_file_count} Parquet files")
+
+        # list tables
+        table_names = []
+        parquet_files_dict = {}
+        for parquet_file_path in parquet_file_paths:
+            file_name = os.path.basename(parquet_file_path)
+            table_name = os.path.splitext(file_name)[0]
+            if table_name[-3:].isdigit():
+                table_name = table_name[:-4]
+            table_names.append(table_name)
+            if table_name in parquet_files_dict:
+                parquet_files_dict[table_name].append(parquet_file_path)
+            else:
+                parquet_files_dict[table_name] = [parquet_file_path]
+        table_names = list(set(table_names))
+
+        # Create a context and register a tables
+        ctx = DatafusionRayContext(2, use_ray_shuffle=True)
+
+        logger.info("Register the Parquet files")
+        start_time_s = perf_counter()
+        for table_name in table_names:
+            if len(parquet_files_dict[table_name]) > 1:
+                raise ValueError(
+                    "Cannot handle multiple part Parquet files with Datafusion Ray"
+                )
+            ctx.register_parquet(table_name, parquet_files_dict[table_name][0])
+        elapsed_time_s = perf_counter() - start_time_s
+        logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
+
+        for i, query in enumerate(queries):
+            query_tag = get_query_tag(query)
+            logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
+
+            skip = False
+
+            # only run certain queries
+            # if i + 1 != 1 or tpc_name != "tpch" or scale_factor != 1.0:
+            #     skip = True
+
+            if skip:
+                d = dict(
+                    [
+                        ("engine", "Datafusion Ray"),
+                        ("file_type", "parquet"),
+                        ("scale_factor", scale_factor),
+                        ("query", i + 1),
+                        ("n_returned_rows", np.NaN),
+                        ("elapsed_time_s", np.NaN),
+                    ]
+                )
+
+            else:
+                start_time_s = perf_counter()
+                result_set = ctx.sql(query)
+                elapsed_time_s = perf_counter() - start_time_s
+                logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
+
+                n_returned_rows = 0
+                for _, item in enumerate(result_set):
+                    n_returned_rows += item.num_rows
+
+                d = dict(
+                    [
+                        ("engine", "Datafusion Ray"),
                         ("file_type", "parquet"),
                         ("scale_factor", scale_factor),
                         ("query", i + 1),

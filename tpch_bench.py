@@ -27,6 +27,7 @@ from bench_tools import (
     run_queries_datafusion_on_lance,
     run_queries_postgresql,
     run_queries_polars_on_parquet,
+    run_queries_datafusion_ray_on_parquet,
 )
 from tpch_queries import sql
 from ref_row_count import tpch_ref_n_rows_returned
@@ -115,6 +116,9 @@ if __name__ == "__main__":
 
     df_tmp = run_queries_ballista_on_parquet(tpch_subfolders, sql, logger)
     df = pd.concat((df, df_tmp), axis=0)
+
+    # df_tmp = run_queries_datafusion_ray_on_parquet(tpch_subfolders, sql, logger)
+    # df = pd.concat((df, df_tmp), axis=0)
 
     # df_tmp = run_queries_datafusion_on_lance(tpch_subfolders, sql, logger)
     # df = pd.concat((df, df_tmp), axis=0)
