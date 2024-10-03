@@ -560,6 +560,9 @@ def run_queries_datafusion_on_parquet(subfolders, queries_datafusion, logger):
                 start_time_s = perf_counter()
                 df = ctx.sql(query)
                 result = df.collect()
+                # import code
+
+                # code.interact(local=dict(globals(), **locals()))
                 elapsed_time_s = perf_counter() - start_time_s
                 logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
 
@@ -644,14 +647,10 @@ def run_queries_ballista_on_parquet(subfolders, queries_datafusion, logger):
             logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
 
             skip = False
-            if (
-                ((tpc_name == "tpch") and (i + 1 == 18) and (scale_factor == 30.0))
-                or ((tpc_name == "tpch") and (i + 1 == 7) and (scale_factor == 100.0))
-                or ((tpc_name == "tpch") and (i + 1 == 17) and (scale_factor == 100.0))
-                or ((tpc_name == "tpch") and (i + 1 == 18) and (scale_factor == 100.0))
-                or ((tpc_name == "tpch") and (i + 1 == 21) and (scale_factor == 100.0))
-            ):
-                skip = True
+
+            # only run certain queries
+            # if i + 1 != 1 or tpc_name != "tpch" or scale_factor != 1.0:
+            #     skip = True
 
             if skip:
                 d = dict(
@@ -669,6 +668,9 @@ def run_queries_ballista_on_parquet(subfolders, queries_datafusion, logger):
                 start_time_s = perf_counter()
                 df = ctx.sql(query)
                 result = df.collect()
+                # import code
+
+                # code.interact(local=dict(globals(), **locals()))
                 elapsed_time_s = perf_counter() - start_time_s
                 logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
 
@@ -718,6 +720,10 @@ def run_queries_datafusion_on_lance(subfolders, queries_datafusion, logger):
         lance_file_paths = glob.glob(os.path.join(folder_path, "*.lance"))
         lance_file_count = len(lance_file_paths)
         logger.info(f"Found {lance_file_count} Lance files")
+
+        if len(lance_file_count) == 0:
+            logger.warning(f"No Lance files found in {folder_path}, skipping...")
+            continue
 
         # list tables
         table_names = []

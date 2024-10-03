@@ -6,6 +6,7 @@ $ python tpch_bench.py -d /home/francois/Data/dbbenchdata -o test.csv
 import os
 import pathlib
 import sys
+import datetime
 from argparse import ArgumentParser
 
 import datafusion
@@ -29,7 +30,7 @@ from bench_tools import (
 )
 from tpch_queries import sql
 from ref_row_count import tpch_ref_n_rows_returned
-from misc import find_subfolders_with_prefix
+from misc import find_subfolders_with_prefix, visualize_timings
 
 
 if __name__ == "__main__":
@@ -68,39 +69,56 @@ if __name__ == "__main__":
     _ = parser.add_argument(
         "-o",
         "--output",
-        dest="output_csv",
-        help="output CSV file path",
+        dest="output_dir",
+        help="output directory path",
         metavar="TXT",
         type=str,
         required=False,
-        default=os.path.join(os.getcwd(), "timings_TPCH.csv"),
+        default=os.path.join(
+            os.getcwd(),
+            "results",
+            datetime.datetime.now().replace(microsecond=0).isoformat(),
+        ),
     )
     args = parser.parse_args()
     data_dir_path = pathlib.Path(args.data_dir_path).resolve()
     logger.info(f"data dir path : {data_dir_path}")
-    output_csv = pathlib.Path(args.output_csv).resolve()
+    logger.info(f"output dir path : {args.output_dir}")
+    # Create the output directory if it does not exist
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    output_csv = pathlib.Path(os.path.join(args.output_dir, "timings.csv")).resolve()
 
     tpch_subfolders = find_subfolders_with_prefix(data_dir_path, "tpch_")
 
     df = pd.DataFrame()
-    # df_tmp = run_queries_polars_on_parquet(tpch_subfolders, sql, logger)
+    df_tmp = run_queries_polars_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
+    df_tmp = run_queries_duckdb_on_duckdb(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
+    df_tmp = run_queries_duckdb_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
+    # df_tmp = run_queries_duckdb_on_lance(tpch_subfolders, sql, logger)
     # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_duckdb_on_duckdb(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_duckdb_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # # df_tmp = run_queries_duckdb_on_lance(tpch_subfolders, sql, logger)
-    # # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_hyper_on_hyper(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_hyper_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
-    # df_tmp = run_queries_datafusion_on_parquet(tpch_subfolders, sql, logger)
-    # df = pd.concat((df, df_tmp), axis=0)
+
+    df_tmp = run_queries_hyper_on_hyper(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
+    df_tmp = run_queries_hyper_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
+    df_tmp = run_queries_datafusion_on_parquet(tpch_subfolders, sql, logger)
+    df = pd.concat((df, df_tmp), axis=0)
+
     df_tmp = run_queries_ballista_on_parquet(tpch_subfolders, sql, logger)
     df = pd.concat((df, df_tmp), axis=0)
+
     # df_tmp = run_queries_datafusion_on_lance(tpch_subfolders, sql, logger)
     # df = pd.concat((df, df_tmp), axis=0)
+
     # df_tmp = run_queries_postgresql(tpch_subfolders, sql, logger)
     # df = pd.concat((df, df_tmp), axis=0)
 
@@ -117,3 +135,4 @@ if __name__ == "__main__":
             )
 
     df.to_csv(output_csv, index=False)
+    visualize_timings(df, args.output_dir)
