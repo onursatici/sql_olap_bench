@@ -12,6 +12,7 @@ import pandas as pd
 import psycopg2
 import lance
 import polars as pl
+from pyspark.sql import SparkSession
 from tableauhyperapi import Connection, CreateMode, HyperProcess, Telemetry
 
 from misc import get_query_tag
@@ -1001,6 +1002,122 @@ def run_queries_polars_on_parquet(subfolders, queries_polars, logger):
                     d = dict(
                         [
                             ("engine", "Polars"),
+                            ("file_type", "parquet"),
+                            ("scale_factor", scale_factor),
+                            ("query", i + 1),
+                            ("n_returned_rows", np.nan),
+                            ("elapsed_time_s", np.nan),
+                        ]
+                    )
+
+            timings.append(d)
+
+        logger.info("====  END  ====")
+        elapsed_time_step = perf_counter() - start_time_step
+        logger.info(f"Elapsed time (s) : {elapsed_time_step:10.3f}")
+
+    timings_df = pd.DataFrame(timings)
+    return timings_df
+
+
+def run_queries_spark_on_parquet(subfolders, queries_spark, logger):
+    timings = []
+
+    for folder_path in subfolders:
+        start_time_step = perf_counter()
+        folder_name = os.path.basename(os.path.normpath(folder_path))
+        scale_factor = float(folder_name.split("_")[-1])
+        if folder_name.startswith("tpch"):
+            tpc_name = "tpch"
+        elif folder_name.startswith("tpcds"):
+            tpc_name = "tpcds"
+        logger.info("==== BEGIN ====")
+        logger.info(
+            f"Spark / .parquet - folder : {folder_name}, scale_factor : {scale_factor}"
+        )
+        queries = get_queries(queries_spark, scale_factor)
+        query_count = len(queries)
+
+        parquet_file_paths = glob.glob(os.path.join(folder_path, "*.parquet"))
+        parquet_file_count = len(parquet_file_paths)
+        logger.info(f"Found {parquet_file_count} Parquet files")
+
+        # list tables
+        table_names = []
+        parquet_files_dict = {}
+        for parquet_file_path in parquet_file_paths:
+            file_name = os.path.basename(parquet_file_path)
+            table_name = os.path.splitext(file_name)[0]
+            if table_name[-3:].isdigit():
+                table_name = table_name[:-4]
+            table_names.append(table_name)
+            if table_name in parquet_files_dict:
+                parquet_files_dict[table_name].append(parquet_file_path)
+            else:
+                parquet_files_dict[table_name] = [parquet_file_path]
+        table_names = list(set(table_names))
+
+
+        spark = (SparkSession.builder
+            .config("spark.sql.shuffle.partitions", "4")
+            .config("spark.driver.memory", "4g")
+            .config("spark.executor.memory", "4g")
+            .master("local[*]")
+            .getOrCreate()
+        )
+
+        logger.info("Register the Parquet files")
+        start_time_s = perf_counter()
+        for table_name in table_names:
+            df = spark.read.parquet(*parquet_files_dict[table_name])
+            df.createOrReplaceTempView(table_name)
+        elapsed_time_s = perf_counter() - start_time_s
+        logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
+
+
+        for i, query in enumerate(queries):
+            query_tag = get_query_tag(query)
+            logger.info(f"query {i+1} / {query_count} : tag {query_tag}")
+
+            skip = False
+            # optionally skip queries here
+
+            if skip:
+                d = dict(
+                    [
+                        ("engine", "Spark"),
+                        ("file_type", "parquet"),
+                        ("scale_factor", scale_factor),
+                        ("query", i + 1),
+                        ("n_returned_rows", np.NaN),
+                        ("elapsed_time_s", np.NaN),
+                    ]
+                )
+            else:
+                try:
+                    start_time_s = perf_counter()
+                    result = spark.sql(query).collect()
+                    # result = pl.SQLContext(dataframes).execute(query).collect()
+                    elapsed_time_s = perf_counter() - start_time_s
+                    logger.info(f"Elapsed time (s) : {elapsed_time_s:10.3f}")
+
+                    n_returned_rows = len(result)
+
+                    d = dict(
+                        [
+                            ("engine", "Spark"),
+                            ("file_type", "parquet"),
+                            ("scale_factor", scale_factor),
+                            ("query", i + 1),
+                            ("n_returned_rows", n_returned_rows),
+                            ("elapsed_time_s", elapsed_time_s),
+                        ]
+                    )
+                except Exception as e:
+                    logger.error(f"Error executing query {i+1}: {str(e)}")
+                    d = dict(
+                        [
+                            ("engine", "Spark"),
                             ("file_type", "parquet"),
                             ("scale_factor", scale_factor),
                             ("query", i + 1),
