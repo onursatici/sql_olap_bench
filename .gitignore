@@ -1,4 +1,5 @@
 data
+results
 timings_*.csv
 
 # Byte-compiled / optimized / DLL files
