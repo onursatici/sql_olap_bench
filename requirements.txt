@@ -10,3 +10,5 @@ polars
 pylance
 altair[all]
 ray==2.37.0
+sqlglot==11.7.1
+# git+https://github.com/palaska/quokka.git@master
